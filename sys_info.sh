@@ -10,12 +10,15 @@ draw_bar() {
     local val=$1
     local name=$2
     local bar_size=15 
-    local filled=$(echo "scale=0; ($val*$bar_size)/100" | bc -l)
-    local empty=$(echo "scale=0; ($bar_size-$filled)" | bc -l)
+    local filled
+    local empty
+    
+    filled=$(echo "scale=0; ($val*$bar_size)/100" | bc -l)
+    empty=$(echo "scale=0; ($bar_size-$filled)" | bc -l)
     
     printf "%-6s: [" "$name"
-    printf "%0.s#" $(seq 1 $filled 2>/dev/null)
-    printf "%0.s." $(seq 1 $empty 2>/dev/null)
+    printf "%0.s#" $(seq 1 "$filled" 2>/dev/null)
+    printf "%0.s." $(seq 1 "$empty" 2>/dev/null)
     printf "] %d%%" "$val"
 }
 
@@ -38,12 +41,12 @@ while true; do
     echo "Time: $(date +%H:%M:%S)                     "
     echo "------------------------------------------------"
 
-    # 1. НАГРУЗКА ПО ЯДРАМ CPU (Вместо одной общей строки)
+    # 1. НАГРУЗКА ПО ЯДРАМ CPU
     grep -E '^cpu[0-9]+' /proc/stat | while read -r line; do
         core_name=$(echo "$line" | awk '{print $1}')
         cpu_usage=$(echo "$line" | awk '{print int(($2+$3+$4)*100/($2+$3+$4+$5+$6+$7+$8))}')
         draw_bar "$cpu_usage" "$core_name"
-        printf "                    \n" # Очистка хвоста строки
+        printf "                    \n"
     done
 
     # Общая температура процессора
@@ -67,13 +70,11 @@ while true; do
     printf "                    \n"
     echo "------------------------------------------------"
 
-    # 4. GPU (Добавили sudo, чтобы правило Sudoers сработало!)
+    # 4. GPU
     if command -v nvidia-smi &> /dev/null; then
-        GPU_DATA=$(sudo -n /usr/bin/nvidia-smi --query-gpu=utilization.gpu,temperature.gpu --format=csv,noheader,nounits 2>/dev/null)
-
-        if [ $? -eq 0 ]; then
-            GPU_LOAD=$(echo $GPU_DATA | cut -d',' -f1 | awk '{printf "%.0f\n", $1}')
-            GPU_TEMP=$(echo $GPU_DATA | cut -d',' -f2 | awk '{printf "%.0f\n", $1}')
+        if GPU_DATA=$(sudo -n /usr/bin/nvidia-smi --query-gpu=utilization.gpu,temperature.gpu --format=csv,noheader,nounits 2>/dev/null); then
+            GPU_LOAD=$(echo "$GPU_DATA" | cut -d',' -f1 | awk '{printf "%.0f\n", $1}')
+            GPU_TEMP=$(echo "$GPU_DATA" | cut -d',' -f2 | awk '{printf "%.0f\n", $1}')
             draw_bar "$GPU_LOAD" "GPU"
             draw_temp "$GPU_TEMP"
             printf "                    \n" 
